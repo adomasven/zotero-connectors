@@ -138,6 +138,9 @@ Zotero.Messaging = new function() {
 			}
 			else {
 				let deferred = Zotero.Promise.defer();
+				if (Zotero.isEdge) {
+					setTimeout(deferred.resolve.bind(deferred, undefined, 1000));
+				}
 				chrome.tabs.sendMessage(tab.id, [messageName, args], options, deferred.resolve);
 				return deferred.promise;
 			}

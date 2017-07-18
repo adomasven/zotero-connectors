@@ -251,8 +251,8 @@ Zotero.Inject = new function() {
 				ReactDOM.unmountComponentAtNode(div);
 				document.body.removeChild(div);
 			}
-			ReactDOM.render(prompt, div);
 			document.body.appendChild(div);	
+			ReactDOM.render(prompt, div);
 		}.bind(this));
 		
 		return deferred.promise;	

@@ -62,31 +62,34 @@ Zotero.Connector_Browser = new function() {
 	 * Called to display select items dialog
 	 */
 	this.onSelect = function(items, callback, tab) {
+		var options = {
+			url: chrome.extension.getURL("itemSelector/itemSelector.html")
+					+ "#" + encodeURIComponent(JSON.stringify([tab.id, items]))
+					// Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=719905 is fixed
+					.replace(/%3A/g, 'ZOTEROCOLON'),
+			height: 600,
+			width: 325,
+			type: 'popup'	
+		};
+		_tabInfo[tab.id].selectCallback = callback;
+		// browser.windows.get does not work at all
+		// browser.windows.create crashes Edge
+		if (Zotero.isEdge) {
+			// still doesn't work on edge. no idea why
+			this.openTab(options.url);
+			return;
+		}
 		chrome.windows.get(tab.windowId, null, function (win) {
-			var width = 600;
-			var height = 325;
-			var left = Math.floor(win.left + (win.width / 2) - (width / 2));
-			var top = Math.floor(win.top + (win.height / 2) - (height / 2));
+			options.left = Math.floor(win.left + (win.width / 2) - (width / 2));
+			options.top = Math.floor(win.top + (win.height / 2) - (height / 2));
 			
-			chrome.windows.create(
-				{
-					url: chrome.extension.getURL("itemSelector/itemSelector.html")
-						+ "#" + encodeURIComponent(JSON.stringify([tab.id, items]))
-						// Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=719905 is fixed
-						.replace(/%3A/g, 'ZOTEROCOLON'),
-					height: height,
-					width: width,
-					top: top,
-					left: left,
-					type: 'popup'
-				},
+			chrome.windows.create(options,
 				function (win) {
 					// Fix positioning in Chrome when window is on second monitor
 					// https://bugs.chromium.org/p/chromium/issues/detail?id=137681
 					if (Zotero.isChrome && win.left < left) {
 						chrome.windows.update(win.id, { left: left });
 					}
-					_tabInfo[tab.id].selectCallback = callback;
 				}
 			);
 		});
@@ -153,6 +156,9 @@ Zotero.Connector_Browser = new function() {
 		// Always inject in the top-frame
 		if (frameId == 0) {
 			return Zotero.Connector_Browser.injectTranslationScripts(tab, frameId);
+		} else if (Zotero.isEdge) {
+			// Edge doesn't support executeScript frameId param.
+			return;
 		}
 		return Zotero.Translators.getWebTranslatorsForLocation(url, tab.url).then(function(translators) {
 			if (translators[0].length == 0) {
@@ -165,12 +171,17 @@ Zotero.Connector_Browser = new function() {
 	};
 
 	/**
+	 * NOTE: Calling this multiple times for frameId==0 will cause unexpected behaviour
+	 * 
 	 * Checks whether translation scripts are already injected into a frame and if not - injects
 	 * @param tab {Object}
 	 * @param [frameId=0] {Number] Defaults to top frame
 	 * @returns {Promise} A promise that resolves when all scripts have been injected
 	 */
 	this.injectTranslationScripts = function(tab, frameId=0) {
+		if (frameId == 0) {
+			return Zotero.Connector_Browser.injectScripts(_injectTranslationScripts, null, tab, frameId)
+		}
 		// Prevent triggering multiple times
 		let key = tab.id+'-'+frameId;
 		let deferred = this.injectTranslationScripts[key];
@@ -212,7 +223,12 @@ Zotero.Connector_Browser = new function() {
 			let deferred = Zotero.Promise.defer();
 			promises.push(deferred.promise);
 			try {
-				chrome.tabs.executeScript(tab.id, {file: script, frameId}, deferred.resolve);
+				let options = {file: script};
+				// Currently unclear what the consequences of this are on Edge
+				if (!Zotero.isEdge) {
+					options.frameId = frameId;
+				}
+				chrome.tabs.executeScript(tab.id, options, deferred.resolve);
 			} catch (e) {
 				deferred.reject(e);
 			}
@@ -234,8 +250,8 @@ Zotero.Connector_Browser = new function() {
 	this.openTab = function(url, tab) {
 		if (tab) {
 			let tabProps = { index: tab.index + 1 };
-			// Firefox doesn't support openerTabId
-			if (!Zotero.isFirefox) {
+			// Firefox and Edge don't support openerTabId
+			if (Zotero.isChrome) {
 				tabProps.openerTabId = tab.id;
 			}
 			chrome.tabs.create(Object.assign({url}, tabProps));

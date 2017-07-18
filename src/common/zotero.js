@@ -39,7 +39,8 @@ var Zotero = new function() {
 	// Edge 20+
 	this.isEdge = !this.isIE && !!window.StyleMedia;
 	// Chrome and Chromium
-	this.isChrome = window.navigator.userAgent.indexOf("Chrome") !== -1 || window.navigator.userAgent.indexOf("Chromium") !== -1;
+	this.isChrome = !this.isEdge && 
+		(window.navigator.userAgent.indexOf("Chrome") !== -1 || window.navigator.userAgent.indexOf("Chromium") !== -1);
 	this.isBrowserExt = this.isFirefox || this.isEdge || this.isChrome;
 
 	if (this.isFirefox) {

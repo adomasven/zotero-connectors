@@ -117,18 +117,15 @@ Zotero.ContentTypeHandler = {
 	confirm: function(details, message, checkboxText="") {
 		let deferred = Zotero.Promise.defer();
 		chrome.tabs.get(details.tabId, function(tab) {
-			// Make sure the scripts to handle the confirmation box are injected
-			Zotero.Connector_Browser.injectTranslationScripts(tab).then(function() {
-				var props = {message};
-				if (checkboxText.length) {
-					props = {
-						message,
-						checkbox: true,
-						checkboxText
-					}
-				}	
-				return Zotero.Messaging.sendMessage('confirm', props, tab)
-			}).then(function(response) {
+			var props = {message};
+			if (checkboxText.length) {
+				props = {
+					message,
+					checkbox: true,
+					checkboxText
+				}
+			}	
+			return Zotero.Messaging.sendMessage('confirm', props, tab).then(function(response) {
 				// If captured URL was pasted on about:blank or other browser pages they respond immediately
 				// with undefined which we treat as cancel here
 				if (!response) {
@@ -152,63 +149,60 @@ Zotero.ContentTypeHandler = {
 	importFile: function(details, type) {
 		chrome.tabs.get(details.tabId, function(tab) {
 			// Make sure scripts injected so we can display the progress window
-			Zotero.Connector_Browser.injectTranslationScripts(tab).then(function() {
-				Zotero.Messaging.sendMessage('progressWindow.show', type == 'csl' ? 'Installing Style' : 'Importing', tab);
-			
-				var xhr = new XMLHttpRequest();
-				// If the original request method was POST, this is likely to fail, because
-				// we do not send the request body. For discussion see
-				// https://github.com/zotero/zotero-connectors/pull/59#discussion_r93317639
-				xhr.open(details.method, details.url);
-				xhr.onreadystatechange = function() {
-					if(xhr.readyState !== 4) return;
-					
-					if (this.status < 200 || this.status >= 400) {
-						throw Error(`IMPORT: Retrieving ${details.url} failed with status ${this.status}.\nResponse body:\n${this.responseText}`);
-					}
-					let options = { headers: {"Content-Type": this.getResponseHeader('Content-Type')} };
-					if (type == 'csl') {
-						options.method = 'installStyle';
-						options.queryString = 'origin=' + encodeURIComponent(details.url);
-						Zotero.Connector.callMethod(options, this.response, function(result, status, response) {
-							if (result) {
-								Zotero.Messaging.sendMessage('progressWindow.itemProgress',
-									[chrome.extension.getURL('images/csl-style.png'), result.name, null, 100], tab);
-							} else if (status == 404) {
-								return Zotero.Messaging.sendMessage('progressWindow.done',
-									[false, 'upgradeClient'], tab);
-							} else {
-								return Zotero.Messaging.sendMessage('progressWindow.done',
-									[false, 'clientRequired'], tab);
-							}
-							Zotero.Messaging.sendMessage('progressWindow.done', [true], tab);
-						});
-					} else {
-						options.method = 'import';
-						Zotero.Connector.callMethod(options, this.response, function(result, status) {
-							if (status == 404) {
-								return Zotero.Messaging.sendMessage('progressWindow.done',
-									[false, 'upgradeClient'], tab);
-							}
-							if (status < 200 || status > 400) {
-								return Zotero.Messaging.sendMessage('progressWindow.done',
-									[false, 'clientRequired'], tab);
-							}
-							Zotero.Messaging.sendMessage('progressWindow.show', 
-								`Imported ${result.length} item` + (result.length > 1 ? 's' : ''), tab);
-							for (let i = 0; i < result.length && i < 20; i++) {
-								let item = result[i];
-								Zotero.Messaging.sendMessage('progressWindow.itemProgress',
-									[Zotero.ItemTypes.getImageSrc(item.itemType), item.title, null, 100], tab);
-							}
-							Zotero.Messaging.sendMessage('progressWindow.done', [true], tab);
-						});
-					}
-				};
-				xhr.send();		
-			});
-		});
+			Zotero.Messaging.sendMessage('progressWindow.show', type == 'csl' ? 'Installing Style' : 'Importing', tab);
 		
+			var xhr = new XMLHttpRequest();
+			// If the original request method was POST, this is likely to fail, because
+			// we do not send the request body. For discussion see
+			// https://github.com/zotero/zotero-connectors/pull/59#discussion_r93317639
+			xhr.open(details.method, details.url);
+			xhr.onreadystatechange = function() {
+				if(xhr.readyState !== 4) return;
+				
+				if (this.status < 200 || this.status >= 400) {
+					throw Error(`IMPORT: Retrieving ${details.url} failed with status ${this.status}.\nResponse body:\n${this.responseText}`);
+				}
+				let options = { headers: {"Content-Type": this.getResponseHeader('Content-Type')} };
+				if (type == 'csl') {
+					options.method = 'installStyle';
+					options.queryString = 'origin=' + encodeURIComponent(details.url);
+					Zotero.Connector.callMethod(options, this.response, function(result, status, response) {
+						if (result) {
+							Zotero.Messaging.sendMessage('progressWindow.itemProgress',
+								[chrome.extension.getURL('images/csl-style.png'), result.name, null, 100], tab);
+						} else if (status == 404) {
+							return Zotero.Messaging.sendMessage('progressWindow.done',
+								[false, 'upgradeClient'], tab);
+						} else {
+							return Zotero.Messaging.sendMessage('progressWindow.done',
+								[false, 'clientRequired'], tab);
+						}
+						Zotero.Messaging.sendMessage('progressWindow.done', [true], tab);
+					});
+				} else {
+					options.method = 'import';
+					Zotero.Connector.callMethod(options, this.response, function(result, status) {
+						if (status == 404) {
+							return Zotero.Messaging.sendMessage('progressWindow.done',
+								[false, 'upgradeClient'], tab);
+						}
+						if (status < 200 || status > 400) {
+							return Zotero.Messaging.sendMessage('progressWindow.done',
+								[false, 'clientRequired'], tab);
+						}
+						Zotero.Messaging.sendMessage('progressWindow.show', 
+							`Imported ${result.length} item` + (result.length > 1 ? 's' : ''), tab);
+						for (let i = 0; i < result.length && i < 20; i++) {
+							let item = result[i];
+							Zotero.Messaging.sendMessage('progressWindow.itemProgress',
+								[Zotero.ItemTypes.getImageSrc(item.itemType), item.title, null, 100], tab);
+						}
+						Zotero.Messaging.sendMessage('progressWindow.done', [true], tab);
+					});
+				}
+			};
+			xhr.send();		
+		});
 	}
 };
 })();
