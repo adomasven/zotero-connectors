@@ -101,6 +101,7 @@ var Zotero = new function() {
 			Zotero.Messaging.init();
 			Zotero.Connector_Types.init();
 			Zotero.Repo.init();
+			Zotero.Connector.init();
 		});
 	};
 	

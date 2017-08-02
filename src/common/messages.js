@@ -127,7 +127,8 @@ var MESSAGES = {
 	Connector: {
 		checkIsOnline: true,
 		callMethod: true,
-		callMethodWithCookies: true
+		callMethodWithCookies: true,
+		getSelectedCollection: true,
 	},
 	Connector_Browser: {
 		onSelect: true,

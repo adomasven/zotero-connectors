@@ -46,11 +46,11 @@ if(isTopWindow) {
 		if (headline) {
 			return Zotero.ProgressWindow.changeHeadline(headline);
 		}
-		return Zotero.Connector.callMethod("getSelectedCollection", {}).then(function(response) {
+		return Zotero.Connector.getSelectedCollection().then(function(response) {
 			Zotero.ProgressWindow.changeHeadline("Saving to ",
-				response.id ? "treesource-collection.png" : "treesource-library.png",
-				response.name+"\u2026");
-			if (response.libraryEditable === false) {
+				response.collection.name ? "treesource-collection.png" : "treesource-library.png",
+				response.collection.name || response.library.name +"\u2026");
+			if (response.library.editable === false) {
 				new Zotero.ProgressWindow.ErrorMessage("collectionNotEditable");
 				Zotero.ProgressWindow.startCloseTimer(8000);
 			}
