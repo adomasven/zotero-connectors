@@ -18,7 +18,7 @@
 			padding: 0 20px;
 			white-space: nowrap;
 		}
-		li:hover {
+		li.enabled:hover {
 			background-color: #4397fa;
 			color: #fff;
 		}
@@ -27,40 +27,147 @@
 			color: inherit;
 			text-decoration: inherit;
 		}
+		li a {
+			color: #8c95a4;
+		}
+		li.enabled a {
+			color: inherit;
+		}
 		hr {
 			border-top: 2px #ddd solid;
 		}
 	</style>
 </head>
 <body>
-<menu>
-	<li><a id="zotero-save-page-with-snapshot" href="javascript:void(0)">Save to Zotero (Web Page with Snapshot)</a></li>
-	<li><a id="zotero-save-page-without-snapshot" href="javascript:void(0)">Save to Zotero (Web Page without Snapshot)</a></li>
-	<hr/>
-	<li><a id="zotero-preferences">Zotero Preferences</a></li>
-</menu>
+<menu></menu>
 <script>
 	(function () {
-		document.getElementById('zotero-preferences').onclick = function() {
-			var Zotero_Connector_Browser = safari.extension.globalPage.contentWindow.Zotero.Connector_Browser;
-			Zotero_Connector_Browser.openTab(safari.extension.baseURI + "preferences/preferences.html");
-			safari.self.hide();
-		};
-		var saveWithSnapshotElem = document.getElementById('zotero-save-page-with-snapshot');
-		saveWithSnapshotElem.onclick = function () {
-			var Zotero_Connector_Browser = safari.extension.globalPage.contentWindow.Zotero.Connector_Browser;
-			Zotero_Connector_Browser.saveAsWebpage(true);
-			safari.self.hide();
-		};
-		var saveWithoutSnapshotElem = document.getElementById('zotero-save-page-without-snapshot');
-		saveWithoutSnapshotElem.onclick = function () {
-			var Zotero_Connector_Browser = safari.extension.globalPage.contentWindow.Zotero.Connector_Browser;
-			Zotero_Connector_Browser.saveAsWebpage(false);
-			safari.self.hide();
-		};
+		var menu = document.getElementsByTagName('menu')[0];
+		var Zotero;
+		
+		function addContextMenuItem(options) {
+			if (options.type == 'separator') {
+				let hr = document.createElement('hr');
+				hr.id = options.id;
+				menu.appendChild(hr);
+			} else {
+				let li = document.createElement('li');
+				li.id = options.id;
 
+				let a = document.createElement('a');
+				a.setAttribute('href', 'javascript:void(0);');
+				a.textContent = options.title;
+				if (options.enabled !== false) {
+					li.classList.add('enabled');
+					li.onclick = function() {
+						safari.self.hide();
+						options.onclick();
+					}
+				}
+
+				li.appendChild(a);
+				menu.appendChild(li);
+			}
+		}
+		
+		function addTranslatorContextMenuItem(translators) {
+			for (let i = 0; i < translators.length; i++) {
+				addContextMenuItem({
+					id: "zotero-context-menu-translator-save" + i,
+					title: _getTranslatorLabel(translators[i]),
+					onclick: function () {
+						Zotero.Connector_Browser.saveWithTranslator(i);
+					}
+				});
+			}
+		}
+		
+		function addWebpageContextMenuItem() {
+			var fns = [];
+			fns.push(() => addContextMenuItem({
+				id: "zotero-context-menu-webpage-withSnapshot-save",
+				title: "Save to Zotero (Web Page with Snapshot)",
+				onclick: function () {
+					Zotero.Connector_Browser.saveAsWebpage(true);
+				},
+			}));
+			fns.push(() => addContextMenuItem({
+				id: "zotero-context-menu-webpage-withoutSnapshot-save",
+				title: "Save to Zotero (Web Page without Snapshot)",
+				onclick: function() {
+					Zotero.Connector_Browser.saveAsWebpage(false);
+				},
+			}));
+			// Swap order if automatic snapshots disabled
+			let withSnapshot = Zotero.Connector.isOnline ? Zotero.Connector.automaticSnapshots :
+				Zotero.Prefs.get('automaticSnapshots');
+			if (!withSnapshot) {
+				fns = [fns[1], fns[0]];
+			}
+			fns.forEach((fn) => fn());
+		}
+		
+		function addPDFContextMenuItem() {
+			addContextMenuItem({
+				id: "zotero-context-menu-pdf-save",
+				title: "Save to Zotero (PDF)",
+				onclick: function (info, tab) {
+					Zotero.Connector_Browser.saveAsWebpage();
+				},
+			});
+		}
+
+		function addSSEContextMenuItems() {
+			var SSEAvailable = Zotero.Connector.SSE.available && Zotero.Connector.isOnline;
+			// Don't even bother with the context menu options if SSE is not available
+			if (SSEAvailable) {
+				let singleItemSelected = Zotero.Connector.selected.items.length == 1;
+				if (singleItemSelected) {
+					var item = Zotero.Connector.selected.items[0];
+					var itemIsAttachment = ['attachment', 'note'].includes(item.type);
+				}
+				addContextMenuItem({
+					type: "separator",
+					id: "zotero-context-menu-sse-separator",
+				});
+				addContextMenuItem({
+					id: "zotero-context-menu-attach-snapshot",
+					title: "Attach Snapshot of Current Page",
+					// Disable if a non-viable item is selected
+					enabled: singleItemSelected && !itemIsAttachment,
+					onclick: function () {
+						Zotero.Connector_Browser.saveAsAttachment(false);
+					},
+				});
+				addContextMenuItem({
+					id: "zotero-context-menu-attach-link",
+					title: "Attach Link of Current Page",
+					enabled: singleItemSelected && !itemIsAttachment,
+					onclick: function () {
+						Zotero.Connector_Browser.saveAsAttachment(true);
+					},
+				});
+			}
+		}
+
+		function addPreferencesContextMenuItem() {
+			addContextMenuItem({
+				type: "separator",
+				id: "zotero-context-menu-pref-separator",
+			});
+
+			addContextMenuItem({
+				id: "zotero-context-menu-preferences",
+				title: "Preferences",
+				onclick: function () {
+					Zotero.Connector_Browser.openTab(safari.extension.baseURI + "preferences/preferences.html");
+				},
+			});
+		}
+		
 		safari.application.addEventListener('popover', function (event) {
-			var Zotero = safari.extension.globalPage.contentWindow.Zotero;
+			Zotero = safari.extension.globalPage.contentWindow.Zotero;
+			if (event.target.identifier != 'zotero-translatorSelector') return;
 			setTimeout(function () {
 				safari.self.height = document.documentElement.offsetHeight;
 				let width = 0;
@@ -72,50 +179,19 @@
 				}
 				safari.self.width = width + 40;
 			});
-
-			let translatorElems = document.getElementsByClassName('translator');
-			for (let i = translatorElems.length-1; i >= 0; i--) {
-				let li = translatorElems[i];
-				li.parentNode.removeChild(li);
-			}
-
-			var withSnapshot = Zotero.Connector.isOnline ? Zotero.Connector.automaticSnapshots :
-				Zotero.Prefs.get('automaticSnapshots');
-			if (withSnapshot) {
-				document.getElementsByTagName('menu')[0]
-					.insertBefore(saveWithSnapshotElem.parentNode, saveWithoutSnapshotElem.parentNode);
-			} else {
-				document.getElementsByTagName('menu')[0]
-					.insertBefore(saveWithoutSnapshotElem.parentNode, saveWithSnapshotElem.parentNode);
-			}
-
-			if (Zotero.Connector_Browser.activeTab.contentType == 'application/pdf') {
-				document.getElementById('zotero-save-page-with-snapshot').textContent = "Save to Zotero (PDF)";
-				document.getElementById('zotero-save-page-without-snapshot').style.display = 'none';
-			}
+			menu.innerHTML = '';
 
 			var translators = Zotero.Connector_Browser.activeTab.translators;
-			if (!translators || event.target.identifier != 'zotero-translatorSelector') return;
-
-			var menu = document.getElementsByTagName('menu')[0];
-			var savePage = menu.firstChild;
-			for (let i = 0; i < translators.length; i++) {
-				let translator = translators[i];
-				let li = document.createElement('li');
-				li.classList.add('translator');
-
-				let a = document.createElement('a');
-				a.setAttribute('href', 'javascript:void(0);');
-				a.textContent = "Save to Zotero (" + translator.label + ")";
-				a.onclick = function () {
-					Zotero.Connector_Browser.saveWithTranslator(i);
-					safari.self.hide();
-				};
-
-				li.appendChild(a);
-				menu.insertBefore(li, savePage);
+			addTranslatorContextMenuItem(translators);
+			if (Zotero.Connector_Browser.activeTab.contentType == 'application/pdf') {
+				addPDFContextMenuItem();
+			} else {
+				addWebpageContextMenuItem();
 			}
+			addSSEContextMenuItems();
+			addPreferencesContextMenuItem();
 		});
+		
 	})();
 </script>
 </body>

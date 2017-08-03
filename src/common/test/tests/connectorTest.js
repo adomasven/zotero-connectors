@@ -43,7 +43,7 @@ describe("Connector", function() {
 			let s = yield background(function() {
 				Zotero.Connector.isOnline = true;
 				Zotero.Connector.SSE.available = true;
-				Zotero.Connector._selected = {collection: 'selected'};
+				Zotero.Connector.selected = {collection: 'selected'};
 				return Zotero.Connector.getSelectedCollection()
 			});
 			assert.equal(s, 'selected');
@@ -52,7 +52,7 @@ describe("Connector", function() {
 			let call = yield background(function() {
 				Zotero.Connector.isOnline = true;
 				Zotero.Connector.SSE.available = false;
-				Zotero.Connector._selected = {collection: 'selected'};
+				Zotero.Connector.selected = {collection: 'selected'};
 				sinon.stub(Zotero.Connector, 'callMethod');
 				return Zotero.Connector.getSelectedCollection().then(function() {
 					let call = Zotero.Connector.callMethod.lastCall;

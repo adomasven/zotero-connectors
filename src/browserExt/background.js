@@ -55,7 +55,7 @@ Zotero.Connector_Browser = new function() {
 		var isPDF = contentType == 'application/pdf';
 		_tabInfo[tab.id] = {translators, instanceID, isPDF};
 		
-		_updateExtensionUI(tab);
+		this._updateExtensionUI(tab);
 	}
 	
 	/**
@@ -123,7 +123,7 @@ Zotero.Connector_Browser = new function() {
 	}
 	
 	this.onTabActivated = function(tab) {
-		_updateExtensionUI(tab);
+		this._updateExtensionUI(tab);
 	};
 	
 	/**
@@ -298,7 +298,11 @@ Zotero.Connector_Browser = new function() {
 	/**
 	 * Update status and tooltip of Zotero button
 	 */
-	function _updateExtensionUI(tab) {
+	this._updateExtensionUI = function(tab) {
+		if (!tab) {
+			return chrome.tabs.query( { lastFocusedWindow: true, active: true }, 
+				(tabs) => tabs.length && this._updateExtensionUI(tabs[0]));
+		}
 		if (Zotero.Prefs.get('firstUse') && Zotero.isFirefox) return _showFirstUseUI(tab);
 		chrome.contextMenus.removeAll();
 
@@ -325,6 +329,8 @@ Zotero.Connector_Browser = new function() {
 		} else {
 			_showWebpageContextMenuItem();
 		}
+		
+		_showSSEContextMenuItems();
 		
 		if (Zotero.isFirefox) {
 			_showPreferencesContextMenuItem();
@@ -490,12 +496,48 @@ Zotero.Connector_Browser = new function() {
 		});
 	}
 	
+	function _showSSEContextMenuItems() {
+		let SSEAvailable = Zotero.Connector.SSE.available && Zotero.Connector.isOnline;
+		// Don't even bother with the context menu options if SSE is not available
+		if (SSEAvailable) {
+			let singleItemSelected = Zotero.Connector.selected.items.length == 1;
+			if (singleItemSelected) {
+				var item = Zotero.Connector.selected.items[0];
+				var itemIsAttachment = ['attachment', 'note'].includes(item.type);
+			}
+			chrome.contextMenus.create({
+				type: "separator",
+				id: "zotero-context-menu-sse-separator",
+				contexts: ['all']
+			});
+			chrome.contextMenus.create({
+				id: "zotero-context-menu-attach-snapshot",
+				title: "Attach Snapshot of Current Page",
+				// Disable if a non-viable item is selected
+				enabled: singleItemSelected && !itemIsAttachment,
+				onclick: function (info, tab) {
+					Zotero.Connector_Browser._saveAsAttachment(tab, false);
+				},
+				contexts: ['all'],
+			});
+			chrome.contextMenus.create({
+				id: "zotero-context-menu-attach-link",
+				title: "Attach Link of Current Page",
+				enabled: singleItemSelected && !itemIsAttachment,
+				onclick: function (info, tab) {
+					Zotero.Connector_Browser._saveAsAttachment(tab, true);
+				},
+				contexts: ['all'],
+			});
+		}
+	}
+	
 	function _browserAction(tab) {
 		if (Zotero.Prefs.get('firstUse') && Zotero.isFirefox) {
 			Zotero.Messaging.sendMessage("firstUse", null, tab)
 			.then(function () {
 				Zotero.Prefs.set('firstUse', false);
-				_updateExtensionUI(tab);
+				Zotero.Connector_Browser._updateExtensionUI(tab);
 			});
 		}
 		else if(_tabInfo[tab.id] && _tabInfo[tab.id].translators && _tabInfo[tab.id].translators.length) {
@@ -532,6 +574,11 @@ Zotero.Connector_Browser = new function() {
 				}
 			);
 		}
+	},
+	
+	this._saveAsAttachment = function(tab, link=false) {
+		return Zotero.Messaging.sendMessage("saveAsAttachment",
+			[tab.title, link, Zotero.Connector.selected.items[0]], tab);
 	}
 	
 	function _getTranslatorLabel(translator) {
@@ -550,7 +597,7 @@ Zotero.Connector_Browser = new function() {
 	chrome.tabs.onRemoved.addListener(_clearInfoForTab);
 
 	chrome.tabs.onUpdated.addListener(function(tabID, changeInfo, tab) {
-		_updateExtensionUI(tab);
+		Zotero.Connector_Browser._updateExtensionUI(tab);
 		if(!changeInfo.url) return;
 		Zotero.debug("Connector_Browser: URL changed for tab " + tab.url);
 		_clearInfoForTab(tabID);

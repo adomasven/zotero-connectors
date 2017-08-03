@@ -36,7 +36,7 @@ Zotero.ProgressWindow = new function() {
 		"fontWeight":"bold", "marginBottom":"6px", "overflow":"hidden",
 		"whiteSpace":"nowrap", "textOverflow":"ellipsis"};
 	const cssHeadlineIcon = {"display":"none", "width":"16px", "height":"16px",
-		"backgroundPosition":"center", "backgroundRepeat":"no-repeat",
+		"backgroundPosition":"center", "backgroundRepeat":"no-repeat", "backgroundSize":"contain",
 		"verticalAlign":"-3px"};
 	const cssItem = {"fontSize":"11px", "margin":"4px 0 4px 0"};
 	const cssIcon = {"position":"absolute", "fontSize":"11px", "width":"16px", "height":"16px",
@@ -178,6 +178,9 @@ Zotero.ProgressWindow = new function() {
 		} else if (err === "collectionNotEditable") {
 			this._div.appendChild(doc.createTextNode("The currently selected collection is not editable. "+
 				"Please select a different collection in Zotero."));
+		} else if (err === "cannotAttach") {
+			this._div.appendChild(doc.createTextNode("Zotero could not attach current page to currently selected items. "+
+				"Please select a single item in Zotero."));
 		} else if (err === "clientRequired") {
 			this._div.appendChild(doc.createTextNode("This item could not be saved because Zotero "+
 				"is not open or is unreachable. Please open Zotero and try again."));

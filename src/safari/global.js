@@ -165,6 +165,13 @@ Zotero.Connector_Browser = new function() {
 		title = title[title.length-1];
 		tab.page.dispatchMessage("saveAsWebpage", [title, withSnapshot]);
 	}
+	
+	this.saveAsAttachment = function (link) {
+		let tab = safari.application.activeBrowserWindow.activeTab;
+		let title = tab.title.split('/');
+		title = title[title.length-1];
+		tab.page.dispatchMessage("saveAsAttachment", [title, link, Zotero.Connector.selected.items[0]]);
+	}
 
 	this.openTab = function(url) {
 		safari.application.activeBrowserWindow.openTab().url = url;
