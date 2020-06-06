@@ -353,6 +353,10 @@
             "minArgs": 0,
             "maxArgs": 0
           },
+          "getPackageDirectoryEntry": {
+            "minArgs": 0,
+            "maxArgs": 0
+          },
           "openOptionsPage": {
             "minArgs": 0,
             "maxArgs": 0
