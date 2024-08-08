@@ -742,8 +742,10 @@ Zotero.Connector_Browser = new function() {
 			var icon, title;
 			if (isOnline) {
 				icon = "images/zotero-z-32px.png";
+				icon = "images/zotero-z-32px.png";
 				title = "Zotero is Online";
 			} else {
+				icon = "images/zotero-z-32px-offline.png";
 				icon = "images/zotero-z-32px-offline.png";
 				title = "Zotero is Offline";
 			}
@@ -810,7 +812,7 @@ Zotero.Connector_Browser = new function() {
 	this._showPDFIcon = function(tab) {
 		browser.action.setIcon({
 			tabId: tab.id,
-			path: getHiDPIImagePaths('images/toolbar/pdf.png')
+			path: getHiDPIImagePaths('images/toolbar/attachment-pdf.png')
 		});
 		browser.action.setTitle({
 			tabId: tab.id,
