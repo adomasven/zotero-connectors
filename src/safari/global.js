@@ -298,12 +298,7 @@ Zotero.Connector_Browser = new function() {
 	}
 
 	function _showTranslatorIcon(translator) {
-		let image = "images/collection.png";
-		if (translator.itemType !== "multiple") {
-			image = Zotero.ItemTypes.getImageSrc(translator.itemType).replace('images/', 'images/toolbar/')
-				.replace(`${safari.extension.baseURI}safari/`, '');
-			
-		}
+		let image = translator.itemType === "multiple" ? "images/collection.png" : Zotero.ItemTypes.getImageSrc(translator.itemType).replace(`${safari.extension.baseURI}safari/`, '');
 		let tooltip = _getTranslatorLabel(translator);
 		return [image, tooltip]
 	}
