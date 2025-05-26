@@ -82,8 +82,10 @@ Zotero.Connector_Types = new function() {
 				var icon = itemType ? itemType[6]/* icon */ : idOrName + '.svg';
 				icon = icon.replace('@2x', '');
 				if (Zotero.isBackground) {
-					// SVG not supported in toolbar
-					icon = 'images/toolbar/' + icon.replace('.svg', '.png');
+					// Use the appropriate toolbar icon
+					// TODO: window.matchMedia is not available in Safari's extension context; How can we detect dark mode?
+					let isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+					icon = 'images/toolbar/' + icon.replace('.svg', isDark ? '-dark.png' : '.png');
 				}
 				else {
 					icon = 'images/' + icon;
