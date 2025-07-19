@@ -38,11 +38,6 @@ rsvg-convert is required
 
 brew install librsvg
 sudo apt install librsvg2-bin
-
-rsvg-convert is required
-
-brew install librsvg
-sudo apt install librsvg2-bin
 DONE
 	exit 1
 }

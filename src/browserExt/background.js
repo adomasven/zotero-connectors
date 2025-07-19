@@ -742,10 +742,8 @@ Zotero.Connector_Browser = new function() {
 			var icon, title;
 			if (isOnline) {
 				icon = "images/zotero-z-32px.png";
-				icon = "images/zotero-z-32px.png";
 				title = "Zotero is Online";
 			} else {
-				icon = "images/zotero-z-32px-offline.png";
 				icon = "images/zotero-z-32px-offline.png";
 				title = "Zotero is Offline";
 			}
