@@ -76,6 +76,9 @@ Zotero.Connector_Types = new function() {
 		Zotero.ItemTypes = new function() {
 			this.schemaType = "itemTypes";
 			Zotero.CachedTypes.call(this);
+
+			Zotero.debug("window.matchMedia: " + (window.matchMedia ? "available" : "not available"));
+			Zotero.debug("matchMedia: " + (matchMedia ? "available" : "not available"));
 			
 			this.getImageSrc = function(idOrName) {
 				var itemType = Zotero.Connector_Types["itemTypes"][idOrName];
