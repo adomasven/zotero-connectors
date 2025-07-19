@@ -785,9 +785,9 @@ Zotero.Connector_Browser = new function() {
 
 		browser.action.setIcon({
 			tabId: tab.id,
-			path: getHiDPIImagePaths(itemType === "multiple"
-				? "images/toolbar/collection.png"
-				: Zotero.ItemTypes.getImageSrc(itemType))
+			path: getHiDPIImagePaths(Zotero.ItemTypes.getImageSrc(itemType === "multiple"
+				? "collection"
+				: itemType))
 		});
 
 		browser.action.setTitle({
@@ -810,7 +810,7 @@ Zotero.Connector_Browser = new function() {
 	this._showPDFIcon = function(tab) {
 		browser.action.setIcon({
 			tabId: tab.id,
-			path: getHiDPIImagePaths('images/toolbar/pdf.png')
+			path: getHiDPIImagePaths(Zotero.ItemTypes.getImageSrc("attachment-pdf"))
 		});
 		browser.action.setTitle({
 			tabId: tab.id,
