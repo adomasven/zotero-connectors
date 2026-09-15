@@ -348,14 +348,24 @@ Zotero.ContentTypeHandler = {
 		var tab = await browser.tabs.get(tabId);
 		this._sendMessageAndHandleBlankPage('progressWindow.show', [sessionID, headline, readOnly], tab);
 	
-		let response = await fetch(url);
-		let responseText = await response.text();
+		let cookies = [];
+		try {
+			cookies = await Zotero.Connector_Browser.getAllCookies({ url, partitionKey: {} }, tabId);
+		}
+		catch (e) {}
+		let response = await Zotero.HTTP.request('GET', url, {
+			successCodes: false,
+			headers: {
+				"Cookie": cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ')
+			},
+		});
+		let responseText = response.responseText;
 		if (response.status < 200 || response.status >= 400) {
 			throw Error(`IMPORT: Retrieving ${url} failed with status ${response.status}.\nResponse body:\n${responseText}`);
 		}
 		let options = {
 			headers: {
-				"Content-Type": response.headers.get('Content-Type')
+				"Content-Type": response.getResponseHeader('Content-Type')
 			}
 		};
 		// Style installation
@@ -404,7 +414,7 @@ Zotero.ContentTypeHandler = {
 				Zotero.Messaging.sendMessage('progressWindow.done', [true], tab);
 			}
 			catch(e) {
-				let err = 'clientRequired';
+				let err = e.status == 0 ? 'clientRequired' : 'unexpectedError';
 				if (e.status == 500 && e.value && e.value.libraryEditable === false) {
 					err = 'collectionNotEditable';
 				}
