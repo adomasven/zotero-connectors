@@ -129,6 +129,7 @@ Zotero.UI.ProgressWindow = class ProgressWindow extends React.PureComponent {
 		this.addMessageListener('progressWindowIframe.hidden', this.handleHidden.bind(this));
 		this.addMessageListener('progressWindowIframe.reset', () => this.setState(this.getInitialState()));
 		this.addMessageListener('progressWindowIframe.willHide', this.handleHiding.bind(this));
+		this.addMessageListener('progressWindowIframe.restoreUserInput', this.restoreUserInput.bind(this));
 		
 		document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
 		
@@ -231,6 +232,30 @@ Zotero.UI.ProgressWindow = class ProgressWindow extends React.PureComponent {
 		this.setState(state, () => {
 			this.setFilter();
 		});
+	}
+	
+	/**
+	 * Restore the target, tags and note chosen by the user when the progress window is
+	 * reopened in a new document (i.e. the extension button popup)
+	 */
+	restoreUserInput({ target, tags, note } = {}) {
+		let state = {};
+		let row = target && this.state.targets?.find(row => row.id == target.id);
+		if (row) {
+			state.target = row;
+			this.target = row;
+			this.expandToTarget(this.state.targets, row);
+		}
+		if (typeof tags == 'string') {
+			tags = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+		}
+		if (Array.isArray(tags)) {
+			state.selectedTags = new Set(tags);
+		}
+		if (typeof note == 'string') {
+			state.note = note;
+		}
+		this.setState(state);
 	}
 	
 	makeReadOnly(target) {
@@ -383,7 +408,7 @@ Zotero.UI.ProgressWindow = class ProgressWindow extends React.PureComponent {
 		if (!this.supportsTagsAutocomplete) {
 			tags = tags.join(",");
 		}
-		this.sendMessage('updated', { target: this.target, note: this.state.note, tags });
+		this.sendMessage('updated', { target: this.target || this.state.target, note: this.state.note, tags });
 	}
 	
 	//
@@ -641,6 +666,12 @@ Zotero.UI.ProgressWindow = class ProgressWindow extends React.PureComponent {
 		// auto-expand the textarea as the user types
 		textarea.style.height = 'auto';
 		textarea.style.height = textarea.scrollHeight + 'px';
+		// The button popup closes as soon as the user clicks outside of it, which may not
+		// leave time for the update on blur, so send updates while typing
+		if (Zotero.isProgressWindowPopup) {
+			clearTimeout(this.noteUpdateTimeout);
+			this.noteUpdateTimeout = setTimeout(this.sendUpdate, 500);
+		}
 	}
 
 	onNoteFocus() {

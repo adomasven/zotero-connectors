@@ -192,6 +192,12 @@ var MESSAGES = {
 		openPreferences: false,
 		bringToFront: true
 	},
+	// Progress window in the extension button popup (Firefox PDFs), see saveWithoutProgressWindow.js
+	ProgressWindowPopup: {
+		getSession: true,
+		waitForSave: true,
+		updateSession: true
+	},
 	Connector_Debug: {
 		storing: true,
 		get: true,

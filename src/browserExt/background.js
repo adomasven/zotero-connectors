@@ -94,6 +94,7 @@ Zotero.Connector_Browser = new function() {
 	 * @returns {Object}
 	 */
 	 this.resetTabInfo = function (tabId) {
+		Zotero.ProgressWindowPopup?.clearSession(tabId);
 		_tabInfo[tabId] = this._getNewTabInfo();
 		return _tabInfo[tabId];
 	}
@@ -701,6 +702,14 @@ Zotero.Connector_Browser = new function() {
 			// A new fun bug from Chrome where the url is sometimes an empty string
 			return;
 		}
+		// Show the progress window in the button popup on pages where we can't inject it
+		if (Zotero.isFirefox) {
+			let popup = Zotero.ProgressWindowPopup.isEnabledForTab(tab)
+				? Zotero.ProgressWindowPopup.getPopupURL(tab.id)
+				: '';
+			browser.action.setPopup({ tabId: tab.id, popup });
+		}
+		
 		browser.contextMenus.removeAll();
 		if (!browser.contextMenus.onClicked.hasListener(_handleContextMenuClick)) {
 			browser.contextMenus.onClicked.addListener(_handleContextMenuClick);
@@ -1071,6 +1080,7 @@ Zotero.Connector_Browser = new function() {
 	 * Removes information about a specific tab
 	 */
 	function _clearInfoForTab(tabID) {
+		Zotero.ProgressWindowPopup?.clearSession(tabID);
 		delete _tabInfo[tabID];
 		delete _tabInjections[tabID];
 	}

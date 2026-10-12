@@ -71,7 +71,13 @@ Zotero.WebRequestIntercept.addListener('headersReceived', function(details) {
 	}, 100);
 });
 
-Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
+/**
+ * @param {Tab} tab
+ * @param {Integer} [frameId]
+ * @param {Object} [session] - Progress window popup session (see Zotero.ProgressWindowPopup)
+ * 	that is updated with the save progress
+ */
+Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId, session) {
 	let url = tab.url;
 	let tabInfo = Zotero.Connector_Browser.getTabInfo(tab.id);
 	const pdf = tabInfo.isPDF;
@@ -84,7 +90,7 @@ Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
 		url,
 		pdf,
 		mimeType: tabInfo.contentType,
-		sessionID: Zotero.Utilities.randomString()
+		sessionID: session?.sessionID || Zotero.Utilities.randomString()
 	};
 	if (pdf) {
 		data.title = tab.title || new URL(url).pathname.split('/').pop();
@@ -92,6 +98,19 @@ Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
 	else {
 		data.title = url;
 	}
+	
+	// The attachment row in the progress window
+	let progressItem = {
+		id: 1,
+		iconSrc: Zotero.ItemTypes.getImageSrc(pdf ? 'attachment-pdf' : 'attachment-webpage'),
+		title: data.title,
+		progress: 0,
+		itemType: Zotero.getString(`itemType_${pdf ? 'pdf' : 'webpage'}`)
+	};
+	if (session) {
+		session.items = [progressItem];
+	}
+	
 	try {
 		browser.browserAction.setIcon({
 			tabId:tab.id,
@@ -108,13 +127,32 @@ Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
 		try {
 			// Check availability before fetching the attachment
 			await Zotero.Connector.ping();
-			await Zotero.ItemSaver.saveStandaloneAttachmentToZotero(data, data.sessionID, tab);
+			let result = await Zotero.ItemSaver.saveStandaloneAttachmentToZotero(data, data.sessionID, tab);
+			if (session && result?.canRecognize) {
+				try {
+					let item = await Zotero.Connector.callMethod("getRecognizedItem", { sessionID: data.sessionID });
+					if (item) {
+						session.items = [
+							{ ...item, id: 2, iconSrc: Zotero.ItemTypes.getImageSrc(item.itemType), progress: 100 },
+							progressItem
+						];
+						progressItem.parentItem = 2;
+					}
+				}
+				catch (e) {
+					Zotero.logError(e);
+				}
+			}
 		}
 		catch (e) {
 			if (e.status !== 0 || !pdf) throw e;
 			data.linkMode = 'imported_url';
+			if (session) {
+				session.savedToServer = true;
+			}
 			await Zotero.ItemSaver.saveAttachmentToServer(data, tab);
 		}
+		progressItem.progress = 100;
 		
 		browser.browserAction.setIcon({
 			tabId:tab.id,
@@ -133,6 +171,10 @@ Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
 		if (e.status !== 0) {
 			Zotero.logError(e);
 		}
+		progressItem.progress = false;
+		if (session) {
+			session.error = e.status === 0 ? 'clientRequired' : 'unexpectedError';
+		}
 		
 		browser.browserAction.setIcon({
 			tabId:tab.id,
@@ -144,4 +186,92 @@ Zotero.Utilities.saveWithoutProgressWindow = async function (tab, frameId) {
 			title: Zotero.getString('browserAction_saveFailed', ZOTERO_CONFIG.CLIENT_NAME)
 		});
 	}
-}
+	finally {
+		if (session) {
+			session.done = true;
+		}
+	}
+};
+
+/**
+ * Firefox does not allow injecting scripts into PDF pages, so we cannot show the in-page
+ * progress window there. Instead, the progress window is shown in the extension button popup,
+ * which is set for such tabs in Zotero.Connector_Browser._updateExtensionUI(). The popup
+ * (progressWindow/progressWindowPopup.js) uses these methods to save the page and
+ * update the save session.
+ */
+Zotero.ProgressWindowPopup = new function () {
+	// tabId -> session
+	const sessions = new Map();
+	
+	this.isEnabledForTab = function (tab) {
+		if (!Zotero.isFirefox || typeof browser.browserAction?.setPopup != 'function') return false;
+		return !!Zotero.Connector_Browser.getTabInfo(tab.id).uninjectable;
+	};
+	
+	this.getPopupURL = function (tabId) {
+		return browser.runtime.getURL(`progressWindow/progressWindow.html?tabId=${tabId}`);
+	};
+	
+	function serialize(session) {
+		let { sessionID, items, done, error, savedToServer, userUpdate } = session;
+		return { sessionID, items, done, error, savedToServer, userUpdate };
+	}
+	
+	/**
+	 * Returns the save session for the tab, starting a save if the page hasn't been saved yet
+	 * (or the last save failed)
+	 */
+	this.getSession = async function (tabId) {
+		let tab = await browser.tabs.get(tabId);
+		let session = sessions.get(tabId);
+		if (!session || session.error) {
+			session = {
+				sessionID: Zotero.Utilities.randomString(),
+				items: [],
+				done: false,
+				error: null,
+				savedToServer: false,
+				userUpdate: null
+			};
+			sessions.set(tabId, session);
+			session.promise = Zotero.Utilities.saveWithoutProgressWindow(tab, 0, session);
+		}
+		return serialize(session);
+	};
+	
+	/**
+	 * Resolves with the session once the save is complete
+	 */
+	this.waitForSave = async function (tabId) {
+		let session = sessions.get(tabId);
+		if (!session) throw new Error(`No progress window popup session for tab ${tabId}`);
+		await session.promise;
+		return serialize(session);
+	};
+	
+	/**
+	 * Updates the target, tags and note of the saved item from the progress window
+	 */
+	this.updateSession = async function (tabId, data) {
+		let session = sessions.get(tabId);
+		if (!session) return;
+		session.userUpdate = data;
+		// The session doesn't exist in the client until the save request is made
+		await session.promise;
+		// Superseded by a later update
+		if (session.userUpdate !== data) return;
+		if (session.error || session.savedToServer) return;
+		await Zotero.Connector.callMethod("updateSession", {
+			sessionID: session.sessionID,
+			target: data.target.id,
+			tags: data.tags,
+			note: data.note.replace(/\n/g, "<br>")
+		});
+	};
+	
+	// Called when the tab navigates or is closed
+	this.clearSession = function (tabId) {
+		sessions.delete(tabId);
+	};
+};

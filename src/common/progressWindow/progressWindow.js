@@ -27,6 +27,12 @@ window.onload = async function () {
 	var div = document.getElementById('progress-window');
 	Zotero.Messaging.init();
 	await Zotero.i18n.init();
+	// Displayed in the extension button popup, see progressWindowPopup.js.
+	// Set up before rendering, so that messages from the component are handled by it.
+	let popupTabId = parseInt(new URLSearchParams(window.location.search).get('tabId'));
+	if (popupTabId) {
+		Zotero.ProgressWindowPopupView.init(popupTabId);
+	}
 	ReactDOM.render(
 		React.createElement(Zotero.UI.ProgressWindow),
 		div
